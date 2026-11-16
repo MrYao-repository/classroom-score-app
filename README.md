@@ -190,7 +190,13 @@ classroom-score-app/
 
 ## 下载
 
-不想装 Python 的话，直接到 [Releases](../../releases) 下载最新的 `课堂积分系统.exe`，双击即用。
+不想装 Python 的话，直接到 [Releases](../../releases) 下载最新的：
+
+| 文件 | 平台 | 说明 |
+| :--- | :--- | :--- |
+| [`ClassroomScoreBoard-v1.0.0.exe`](../../releases/download/v1.0.0/ClassroomScoreBoard-v1.0.0.exe) | Windows 10 / 11 64 位 | 18.56 MB，双击即用，无需 Python |
+
+> 首次运行会在 exe 同级目录生成 `student_data.json`。请把它放在可写目录（桌面、文档、D 盘均可），不要放进 `Program Files`；升级版本时保留该文件即可续分。
 
 ## 常见问题
 
