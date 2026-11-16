@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  syntax-check:
+    name: Syntax check (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.9', '3.12' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Byte-compile the application
+        run: python -m py_compile "课堂积分系统.py"
+
+      - name: Verify asset references resolve
+        run: |
+          python - <<'PY'
+          import re, os, sys
+          src = open("课堂积分系统.py", encoding="utf-8").read()
+          missing = []
+          # 静态检查：模板字符串里的固定资源路径
+          for m in re.finditer(r'asset\("(\w+)", "([^"{}]+)"\)', src):
+              p = os.path.join("assets_proc", m.group(1), m.group(2))
+              if not os.path.exists(p):
+                  missing.append(p)
+          # 静态检查：以字典形式出现的背景图路径
+          for m in re.finditer(r'"bg_img":\s*"([^"]+)"', src):
+              p = os.path.join("assets_proc", *m.group(1).split("/"))
+              if not os.path.exists(p):
+                  missing.append(p)
+          # 头像与图标按编号/名称拼路径，逐个核对
+          for i in range(1, 7):
+              p = os.path.join("assets_proc", "avatars", f"student-{i:02d}.png")
+              if not os.path.exists(p):
+                  missing.append(p)
+          if missing:
+              print("Missing assets:")
+              print("\n".join(missing))
+              sys.exit(1)
+          print("All referenced assets exist.")
+          PY
