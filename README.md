@@ -4,7 +4,7 @@
 
 **一款为课堂即时反馈设计的桌面积分板 —— 6 人卡片、一键加减分、自动存档、深浅双主题**
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?logo=windows&logoColor=white)](#兼容性)
 [![UI](https://img.shields.io/badge/UI-customtkinter-1F6FEB)](https://github.com/TomSchimansky/CustomTkinter)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -57,7 +57,7 @@
 | 项目 | 要求 |
 | :--- | :--- |
 | 操作系统 | Windows 10（1809 及以上）或 Windows 11，64 位 |
-| Python | 3.8 及以上（开发与实测版本为 3.15） |
+| Python | 3.9 及以上（CI 在 3.12 / 3.13 上校验，开发实测 3.13 与 3.15） |
 | 分辨率 | 1280×720 及以上（窗口会按屏宽 90%、屏高 92% 自适应，宽高夹在 1260–1340 × 720–900 之间） |
 | 显示缩放 | 100%–200% 均可，程序启动时自动适配 |
 | 依赖库 | `customtkinter`、`Pillow` |
