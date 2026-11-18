@@ -14,10 +14,7 @@ import time
 from tkinter import messagebox
 
 import customtkinter as ctk
-from PIL import Image, ImageTk
-
-# Pillow 新旧版本缩放别名兼容
-LANCZOS = getattr(getattr(Image, "Resampling", None), "LANCZOS", Image.LANCZOS)
+from PIL import Image
 
 # 高分屏 DPI 感知：进程启动时声明一次，主窗与迷你小窗的文字/图标都清晰不模糊
 try:
@@ -119,16 +116,39 @@ def load_data():
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError("存档根节点不是对象")
             for k, v in DEFAULT_DATA.items():
                 data.setdefault(k, v if not isinstance(v, dict) else v.copy())
+            if data["theme"] not in THEME:
+                data["theme"] = DEFAULT_DATA["theme"]
+            if data["point_value"] not in (1, 2, 5):
+                data["point_value"] = DEFAULT_DATA["point_value"]
+            if isinstance(data["students"], dict):
+                data["students"] = {str(k): v for k, v in data["students"].items()
+                                    if isinstance(v, (int, float))}
+            else:
+                data["students"] = {}
+            if not data["students"]:
+                data["students"] = DEFAULT_DATA["students"].copy()
             return data
         except Exception:
             pass
     return json.loads(json.dumps(DEFAULT_DATA))
 
 def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    """先写临时文件再原子替换，避免写入中断导致存档 JSON 损坏。"""
+    tmp = DATA_FILE + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, DATA_FILE)
+    except Exception:
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except Exception:
+            pass
 
 
 # ===================== 主程序 =====================
@@ -160,6 +180,9 @@ class ScoreApp(ctk.CTk):
         self.add_btns = {}
         self.icon_imgs = {}
         self.avatar_imgs = {}
+        # 姓名槽：回调捕获这个可变引用而非姓名字符串，改名时只需更新槽内容，
+        # 已绑定到控件上的 lambda 便能自动拿到新姓名，避免闭包持有旧名崩溃。
+        self.name_refs = {}
 
         # 撤销 / 重做 双栈
         self.undo_stack = []
@@ -186,17 +209,25 @@ class ScoreApp(ctk.CTk):
         self.add_log("系统启动，历史数据已加载")
 
     # ---------- 图片加载 ----------
+    def _load_image(self, *parts, size):
+        """读取 PNG 并转 RGBA；素材缺失时回退为同尺寸透明图，避免整体崩溃。"""
+        try:
+            return Image.open(asset(*parts)).convert("RGBA")
+        except Exception:
+            return Image.new("RGBA", size, (0, 0, 0, 0))
+
     def ctk_icon(self, name, size=(26, 26)):
         key = (name, tuple(size))
         if key not in self.icon_imgs:
-            im = Image.open(asset("icons", f"{name}.png")).convert("RGBA")
+            im = self._load_image("icons", f"{name}.png", size=size)
             self.icon_imgs[key] = ctk.CTkImage(light_image=im, dark_image=im, size=size)
         return self.icon_imgs[key]
 
     def ctk_avatar(self, idx, size=(64, 64)):
         key = (idx, tuple(size))
         if key not in self.avatar_imgs:
-            im = Image.open(asset("avatars", f"student-{idx:02d}.png")).convert("RGBA")
+            safe_idx = ((idx - 1) % 6) + 1  # 学生超过 6 人时循环复用头像
+            im = self._load_image("avatars", f"student-{safe_idx:02d}.png", size=size)
             self.avatar_imgs[key] = ctk.CTkImage(light_image=im, dark_image=im, size=size)
         return self.avatar_imgs[key]
 
@@ -282,8 +313,11 @@ class ScoreApp(ctk.CTk):
             card = ctk.CTkFrame(self.card_area, corner_radius=22, border_width=1)
             card.grid(row=row, column=col, padx=12, pady=10, sticky="nsew")
             self.card_frames[name] = card
-            card.bind("<Enter>", lambda e, n=name: self.card_hover(n, True))
-            card.bind("<Leave>", lambda e, n=name: self.card_hover(n, False))
+            # 每张卡片绑定一个稳定的姓名槽，所有回调经它间接取当前姓名
+            ref = [name]
+            self.name_refs[name] = ref
+            card.bind("<Enter>", lambda e, r=ref: self.card_hover(r[0], True))
+            card.bind("<Leave>", lambda e, r=ref: self.card_hover(r[0], False))
 
             avatar = ctk.CTkLabel(card, image=self.ctk_avatar(idx + 1), text="")
             avatar.pack(pady=(12, 2))
@@ -292,7 +326,7 @@ class ScoreApp(ctk.CTk):
                 card, text=name, font=("微软雅黑", 17, "bold"), cursor="hand2"
             )
             name_label.pack(pady=(0, 2))
-            name_label.bind("<Double-Button-1>", lambda e, n=name: self.rename_student(n))
+            name_label.bind("<Double-Button-1>", lambda e, r=ref: self.rename_student(r[0]))
             self.name_labels[name] = name_label
 
             score_label = ctk.CTkLabel(
@@ -307,7 +341,7 @@ class ScoreApp(ctk.CTk):
             add_btn = ctk.CTkButton(
                 card, text=f"＋ {self.point_value} 分", width=150, height=40,
                 corner_radius=20, font=("微软雅黑", 14, "bold"),
-                command=lambda n=name: self.add_score(n)
+                command=lambda r=ref: self.add_score(r[0])
             )
             add_btn.pack(pady=(0, 6))
             self.add_btns[name] = add_btn
@@ -316,18 +350,18 @@ class ScoreApp(ctk.CTk):
             btn_row.pack(pady=(0, 12))
             sub_btn = ctk.CTkButton(
                 btn_row, text="－1", width=72, height=30, corner_radius=15,
-                font=("微软雅黑", 13, "bold"), command=lambda n=name: self.sub_score(n)
+                font=("微软雅黑", 13, "bold"), command=lambda r=ref: self.sub_score(r[0])
             )
             sub_btn.pack(side="left", padx=4)
             clear_btn = ctk.CTkButton(
                 btn_row, text="清零", width=72, height=30, corner_radius=15,
-                font=("微软雅黑", 13, "bold"), command=lambda n=name: self.clear_single(n)
+                font=("微软雅黑", 13, "bold"), command=lambda r=ref: self.clear_single(r[0])
             )
             clear_btn.pack(side="left", padx=4)
 
             for w in [avatar, name_label, score_label, unit_label, add_btn, btn_row]:
-                w.bind("<Enter>", lambda e, n=name: self.card_hover(n, True))
-                w.bind("<Leave>", lambda e, n=name: self.card_hover(n, False))
+                w.bind("<Enter>", lambda e, r=ref: self.card_hover(r[0], True))
+                w.bind("<Leave>", lambda e, r=ref: self.card_hover(r[0], False))
 
         for i in range(3):
             self.card_area.grid_columnconfigure(i, weight=1)
@@ -411,7 +445,7 @@ class ScoreApp(ctk.CTk):
             hover_color="#E2E8F0" if self.current_theme == "light" else "#35486B",
             text_color=self.c["text_main"])
         self.topmost_btn.configure(
-            fg_color=self.c["btn_primary"] if "btn_primary" in self.c else self.c["header_a"],
+            fg_color=self.c["header_a"],
             hover_color=self.c["header_b"], text_color="white")
         self.reset_all_btn.configure(fg_color=self.c["btn_sub_text"],
                                      hover_color="#B91C1C", text_color="white")
@@ -453,6 +487,8 @@ class ScoreApp(ctk.CTk):
 
     # ---------- 卡片悬浮 ----------
     def card_hover(self, name, enter):
+        if name not in self.card_frames:
+            return
         self.card_frames[name].configure(
             fg_color=self.c["card_hover"] if enter else self.c["card_bg"],
             border_color=self.c["score_color"] if enter else self.c["card_border"])
@@ -564,7 +600,7 @@ class ScoreApp(ctk.CTk):
             ctk.CTkButton(cell, text=f"+{self.point_value}", width=42, height=22,
                           corner_radius=11, font=("微软雅黑", 11, "bold"),
                           fg_color=self.c["btn_add"], hover_color=self.c["btn_add_hover"],
-                          command=lambda n=name: self.mini_add(n)
+                          command=lambda r=self.name_refs.get(name, [name]): self.mini_add(r[0])
                           ).pack(side="right", padx=7)
         body.grid_columnconfigure(0, weight=1)
         body.grid_columnconfigure(1, weight=1)
@@ -582,6 +618,8 @@ class ScoreApp(ctk.CTk):
         self.withdraw()
 
     def mini_add(self, name):
+        if name not in self.scores:
+            return
         old = self.scores[name]
         self.scores[name] += self.point_value
         self.push_undo({"type": "add", "name": name, "old": old, "new": self.scores[name]})
@@ -589,6 +627,7 @@ class ScoreApp(ctk.CTk):
         if name in self.mini_score_labels and self.mini_score_labels[name].winfo_exists():
             self.mini_score_labels[name].configure(text=str(self.scores[name]))
         self.add_log(f"✅ {name} +{self.point_value} → {self.scores[name]} 分")
+        self.check_milestone(name)
 
     def exit_mini(self):
         if self.mini_win and self.mini_win.winfo_exists():
@@ -668,12 +707,17 @@ class ScoreApp(ctk.CTk):
             for n, v in self.scores.items():
                 self.score_labels[n].configure(text=str(v))
             self.all_data["students"] = self.scores
-            self.redo_stack.append(entry)
+        elif entry["type"] == "rename":
+            self._apply_rename(entry["new_name"], entry["old_name"])
         else:
             name = entry["name"]
+            if name not in self.scores:
+                self.add_log("⚠ 记录已失效，跳过该步撤销")
+                save_data(self.all_data)
+                return
             self.scores[name] = entry["old"]
             self.refresh_score(name)
-            self.redo_stack.append(entry)
+        self.redo_stack.append(entry)
         save_data(self.all_data)
         self.add_log("↩ 已撤销上一步")
 
@@ -687,12 +731,17 @@ class ScoreApp(ctk.CTk):
                 self.scores[name] = 0
                 self.score_labels[name].configure(text="0")
             self.all_data["students"] = self.scores
-            self.undo_stack.append(entry)
+        elif entry["type"] == "rename":
+            self._apply_rename(entry["old_name"], entry["new_name"])
         else:
             name = entry["name"]
+            if name not in self.scores:
+                self.add_log("⚠ 记录已失效，跳过该步重做")
+                save_data(self.all_data)
+                return
             self.scores[name] = entry["new"]
             self.refresh_score(name)
-            self.undo_stack.append(entry)
+        self.undo_stack.append(entry)
         save_data(self.all_data)
         self.add_log("↪ 已重做上一步")
 
@@ -710,7 +759,7 @@ class ScoreApp(ctk.CTk):
             self.roll_students()
 
     def roll_students(self):
-        if not self.is_rolling:
+        if not self.is_rolling or not self.winfo_exists():
             return
         name = random.choice(list(self.scores.keys()))
         self.roll_text.configure(text=name)
@@ -722,6 +771,35 @@ class ScoreApp(ctk.CTk):
             self.roll_avatar.configure(image=self.ctk_avatar(idx, size=(54, 54)), text="")
 
     # ---------- 改名 ----------
+    def _migrate_name(self, old, new):
+        """改名时同步各类历史引用，防止撤销/重做使用已失效的旧姓名。"""
+        for stack in (self.undo_stack, self.redo_stack):
+            for entry in stack:
+                if entry.get("name") == old:
+                    entry["name"] = new
+                if entry.get("type") == "reset_all" and old in entry["snapshot"]:
+                    entry["snapshot"] = {
+                        new if k == old else k: v for k, v in entry["snapshot"].items()
+                    }
+        if old in self.milestone_fired:
+            self.milestone_fired.discard(old)
+            self.milestone_fired.add(new)
+
+    def _apply_rename(self, old_name, new_name):
+        # 用原顺序重建 students，避免 pop+赋值把改名学生挤到末尾、卡片重排
+        self.scores = {new_name if k == old_name else k: v for k, v in self.scores.items()}
+        self.all_data["students"] = self.scores
+        for key in ("score_labels", "card_frames", "name_labels", "add_btns"):
+            getattr(self, key)[new_name] = getattr(self, key).pop(old_name)
+        if old_name in self.mini_score_labels:
+            self.mini_score_labels[new_name] = self.mini_score_labels.pop(old_name)
+        if old_name in self.name_refs:
+            ref = self.name_refs.pop(old_name)
+            ref[0] = new_name          # 关键：让已绑定的所有回调指向新姓名
+            self.name_refs[new_name] = ref
+        self.name_labels[new_name].configure(text=new_name)
+        self._migrate_name(old_name, new_name)
+
     def rename_student(self, old_name):
         dlg = ctk.CTkInputDialog(text=f"请输入「{old_name}」的新姓名：", title="修改姓名")
         new_name = dlg.get_input()
@@ -730,11 +808,8 @@ class ScoreApp(ctk.CTk):
         if new_name in self.scores:
             messagebox.showwarning("提示", "该姓名已存在")
             return
-        self.scores[new_name] = self.scores.pop(old_name)
-        self.all_data["students"] = self.scores
-        for key in ("score_labels", "card_frames", "name_labels", "add_btns"):
-            getattr(self, key)[new_name] = getattr(self, key).pop(old_name)
-        self.name_labels[new_name].configure(text=new_name)
+        self._apply_rename(old_name, new_name)
+        self.push_undo({"type": "rename", "old_name": old_name, "new_name": new_name})
         save_data(self.all_data)
         self.add_log(f"✏ 「{old_name}」改名为「{new_name}」")
 
@@ -789,7 +864,8 @@ class ScoreApp(ctk.CTk):
         label = self.score_labels[name]
         flash = self.c["btn_add"] if up else self.c["btn_sub_text"]
         label.configure(text_color=flash)
-        self.after(220, lambda: label.configure(text_color=self.c["score_color"]))
+        self.after(220, lambda: label.configure(text_color=self.c["score_color"])
+                   if label.winfo_exists() else None)
         if not up:
             return
         card = self.card_frames[name]
@@ -829,9 +905,8 @@ class ScoreApp(ctk.CTk):
         win.configure(fg_color="#FFF8EC")
         win.transient(self)
         sticker = random.choice(["medal", "star", "trophy-big", "thumb"])
-        img = ctk.CTkImage(light_image=Image.open(asset("stickers", f"{sticker}.png")).convert("RGB"),
-                           dark_image=Image.open(asset("stickers", f"{sticker}.png")).convert("RGB"),
-                           size=(150, 150))
+        sticker_img = Image.open(asset("stickers", f"{sticker}.png")).convert("RGB")
+        img = ctk.CTkImage(light_image=sticker_img, dark_image=sticker_img, size=(150, 150))
         ctk.CTkLabel(win, image=img, text="").pack(pady=(22, 6))
         ctk.CTkLabel(win, text=f"🎉 {name} 太棒了！", font=("微软雅黑", 20, "bold"),
                      text_color="#D97706").pack()

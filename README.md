@@ -194,7 +194,7 @@ classroom-score-app/
 
 | 文件 | 平台 | 说明 |
 | :--- | :--- | :--- |
-| [`ClassroomScoreBoard-v1.0.0.exe`](../../releases/download/v1.0.0/ClassroomScoreBoard-v1.0.0.exe) | Windows 10 / 11 64 位 | 18.56 MB，双击即用，无需 Python |
+| [`ClassroomScoreBoard-v1.0.1.exe`](../../releases/download/v1.0.1/ClassroomScoreBoard-v1.0.1.exe) | Windows 10 / 11 64 位 | 33.64 MB，双击即用，无需 Python |
 
 > 首次运行会在 exe 同级目录生成 `student_data.json`。请把它放在可写目录（桌面、文档、D 盘均可），不要放进 `Program Files`；升级版本时保留该文件即可续分。
 
