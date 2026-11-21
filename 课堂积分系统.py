@@ -59,12 +59,15 @@ THEME = {
         "btn_add": "#F59E0B",
         "btn_add_hover": "#D97706",
         "btn_sub": "#FEE2E2",
+        "btn_sub_hover": "#FECACA",
         "btn_sub_text": "#DC2626",
         "btn_clear": "#E5E7EB",
+        "btn_clear_hover": "#D1D5DB",
         "btn_clear_text": "#4B5563",
         "side_btn": "#FFFFFF",
         "side_btn_hover": "#EFF6FF",
         "side_btn_text": "#1F2937",
+        "section_title": "#1E40AF",
         "score_color": "#2563EB",
         "status_text": "#8A97A8",
         "log_bg": "#FFFFFF",
@@ -84,12 +87,15 @@ THEME = {
         "btn_add": "#F59E0B",
         "btn_add_hover": "#D97706",
         "btn_sub": "#3B2530",
+        "btn_sub_hover": "#4E3040",
         "btn_sub_text": "#F87171",
         "btn_clear": "#2E3B52",
+        "btn_clear_hover": "#3A4A66",
         "btn_clear_text": "#CBD5E1",
         "side_btn": "#263449",
         "side_btn_hover": "#30435F",
         "side_btn_text": "#E2E8F0",
+        "section_title": "#93C5FD",
         "score_color": "#60A5FA",
         "status_text": "#7B8BA3",
         "log_bg": "#141F33",
@@ -177,7 +183,10 @@ class ScoreApp(ctk.CTk):
         self.score_labels = {}
         self.card_frames = {}
         self.name_labels = {}
+        self.unit_labels = {}
         self.add_btns = {}
+        self.sub_btns = {}
+        self.clear_btns = {}
         self.icon_imgs = {}
         self.avatar_imgs = {}
         # 姓名槽：回调捕获这个可变引用而非姓名字符串，改名时只需更新槽内容，
@@ -239,55 +248,61 @@ class ScoreApp(ctk.CTk):
         self.header.pack_propagate(False)
 
         self.title_label = ctk.CTkLabel(
-            self.header, text="📖 课堂积分系统 Pro",
-            font=("微软雅黑", 24, "bold"), text_color="white"
+            self.header, text="课堂积分系统 Pro",
+            font=("微软雅黑", 22, "bold"), text_color="white"
         )
-        self.title_label.place(x=34, rely=0.5, anchor="w")
+        self.title_label.pack(side="left", padx=(30, 0))
+        self.title_label.bind("<Button-1>", self._main_drag_start)
+        self.title_label.bind("<B1-Motion>", self._main_drag_motion)
+
+        # 右侧操作区：按钮自动排布，避免硬编码坐标在不同窗口宽度下错位
+        header_right = ctk.CTkFrame(self.header, fg_color="transparent")
+        header_right.pack(side="right", fill="y", padx=(0, 12))
+        header_right.bind("<Button-1>", self._main_drag_start)
+        header_right.bind("<B1-Motion>", self._main_drag_motion)
 
         self.theme_btn = ctk.CTkButton(
-            self.header, text="主题", image=self.ctk_icon("theme", (34, 34)),
-            compound="left", width=126, height=42, corner_radius=21,
+            header_right, text="主题", image=self.ctk_icon("theme", (32, 32)),
+            compound="left", width=120, height=40, corner_radius=20,
             font=("微软雅黑", 13, "bold"), command=self.toggle_theme
         )
-        self.theme_btn.place(x=688, y=20)
+        self.theme_btn.pack(side="left", padx=4, pady=21)
 
         self.topmost_btn = ctk.CTkButton(
-            self.header, text="置顶", image=self.ctk_icon("pin", (34, 34)),
-            compound="left", width=116, height=42, corner_radius=21,
+            header_right, text="置顶", image=self.ctk_icon("pin", (32, 32)),
+            compound="left", width=112, height=40, corner_radius=20,
             font=("微软雅黑", 13, "bold"), command=self.toggle_topmost
         )
-        self.topmost_btn.place(x=826, y=20)
+        self.topmost_btn.pack(side="left", padx=4, pady=21)
 
         self.reset_all_btn = ctk.CTkButton(
-            self.header, text="全清", image=self.ctk_icon("reset", (34, 34)),
-            compound="left", width=112, height=42, corner_radius=21,
+            header_right, text="全清", image=self.ctk_icon("reset", (32, 32)),
+            compound="left", width=108, height=40, corner_radius=20,
             font=("微软雅黑", 13, "bold"), command=self.reset_all
         )
-        self.reset_all_btn.place(x=954, y=20)
+        self.reset_all_btn.pack(side="left", padx=4, pady=21)
 
         self.mini_btn = ctk.CTkButton(
-            self.header, text="迷你", width=86, height=42, corner_radius=21,
+            header_right, text="迷你", width=82, height=40, corner_radius=20,
             font=("微软雅黑", 13, "bold"), command=self.enter_mini
         )
-        self.mini_btn.place(x=1074, y=20)
+        self.mini_btn.pack(side="left", padx=4, pady=21)
 
-        # 自绘窗口控制：最小化 / 关闭（白色透明底图标）
+        # 窗口控制：减号（最小化）与叉号（关闭），使用极简白色图标
         self.min_win_btn = ctk.CTkButton(
-            self.header, text="", image=self.ctk_icon("minimize", (20, 20)),
-            width=34, height=42, corner_radius=8, command=self.minimize_window
+            header_right, text="", image=self.ctk_icon("icon-minus", (22, 22)),
+            width=34, height=40, corner_radius=8, command=self.minimize_window
         )
-        self.min_win_btn.place(x=1168, y=20)
+        self.min_win_btn.pack(side="left", padx=(10, 0), pady=21)
         self.close_win_btn = ctk.CTkButton(
-            self.header, text="", image=self.ctk_icon("close", (20, 20)),
-            width=34, height=42, corner_radius=8, command=self.close_window
+            header_right, text="", image=self.ctk_icon("icon-close", (22, 22)),
+            width=34, height=40, corner_radius=8, command=self.close_window
         )
-        self.close_win_btn.place(x=1208, y=20)
+        self.close_win_btn.pack(side="left", padx=(2, 0), pady=21)
 
         # 无边框模式下按住标题栏拖动主窗口
         self.header.bind("<Button-1>", self._main_drag_start)
         self.header.bind("<B1-Motion>", self._main_drag_motion)
-        self.title_label.bind("<Button-1>", self._main_drag_start)
-        self.title_label.bind("<B1-Motion>", self._main_drag_motion)
 
         # 主体：左卡片 + 右侧栏
         self.body = ctk.CTkFrame(self, fg_color="transparent")
@@ -320,44 +335,47 @@ class ScoreApp(ctk.CTk):
             card.bind("<Leave>", lambda e, r=ref: self.card_hover(r[0], False))
 
             avatar = ctk.CTkLabel(card, image=self.ctk_avatar(idx + 1), text="")
-            avatar.pack(pady=(12, 2))
+            avatar.pack(pady=(14, 4))
 
             name_label = ctk.CTkLabel(
-                card, text=name, font=("微软雅黑", 17, "bold"), cursor="hand2"
+                card, text=name, font=("微软雅黑", 18, "bold"), cursor="hand2"
             )
             name_label.pack(pady=(0, 2))
             name_label.bind("<Double-Button-1>", lambda e, r=ref: self.rename_student(r[0]))
             self.name_labels[name] = name_label
 
             score_label = ctk.CTkLabel(
-                card, text=str(self.scores[name]), font=("微软雅黑", 38, "bold")
+                card, text=str(self.scores[name]), font=("微软雅黑", 42, "bold")
             )
-            score_label.pack()
+            score_label.pack(pady=(2, 0))
             self.score_labels[name] = score_label
 
-            unit_label = ctk.CTkLabel(card, text="积分", font=("微软雅黑", 12))
-            unit_label.pack(pady=(0, 6))
+            unit_label = ctk.CTkLabel(card, text="积分", font=("微软雅黑", 11))
+            unit_label.pack(pady=(0, 10))
+            self.unit_labels[name] = unit_label
 
             add_btn = ctk.CTkButton(
-                card, text=f"＋ {self.point_value} 分", width=150, height=40,
-                corner_radius=20, font=("微软雅黑", 14, "bold"),
+                card, text=f"＋ {self.point_value}", width=156, height=42,
+                corner_radius=21, font=("微软雅黑", 16, "bold"),
                 command=lambda r=ref: self.add_score(r[0])
             )
-            add_btn.pack(pady=(0, 6))
+            add_btn.pack(pady=(0, 8))
             self.add_btns[name] = add_btn
 
             btn_row = ctk.CTkFrame(card, fg_color="transparent")
-            btn_row.pack(pady=(0, 12))
+            btn_row.pack(pady=(0, 14))
             sub_btn = ctk.CTkButton(
-                btn_row, text="－1", width=72, height=30, corner_radius=15,
+                btn_row, text="－1", width=72, height=32, corner_radius=16,
                 font=("微软雅黑", 13, "bold"), command=lambda r=ref: self.sub_score(r[0])
             )
-            sub_btn.pack(side="left", padx=4)
+            sub_btn.pack(side="left", padx=5)
+            self.sub_btns[name] = sub_btn
             clear_btn = ctk.CTkButton(
-                btn_row, text="清零", width=72, height=30, corner_radius=15,
+                btn_row, text="清零", width=72, height=32, corner_radius=16,
                 font=("微软雅黑", 13, "bold"), command=lambda r=ref: self.clear_single(r[0])
             )
-            clear_btn.pack(side="left", padx=4)
+            clear_btn.pack(side="left", padx=5)
+            self.clear_btns[name] = clear_btn
 
             for w in [avatar, name_label, score_label, unit_label, add_btn, btn_row]:
                 w.bind("<Enter>", lambda e, r=ref: self.card_hover(r[0], True))
@@ -368,66 +386,63 @@ class ScoreApp(ctk.CTk):
         for i in range(2):
             self.card_area.grid_rowconfigure(i, weight=1)
 
+    def _section_title(self, text):
+        """分区标题：左侧一条竖向强调色 + 标题文字，强化视觉层次。"""
+        row = ctk.CTkFrame(self.side_panel, fg_color="transparent")
+        row.pack(fill="x", padx=20, pady=(18, 8))
+        bar = ctk.CTkFrame(row, width=4, height=18, corner_radius=2, fg_color="#3B82F6")
+        bar.pack(side="left", padx=(0, 9))
+        bar.pack_propagate(False)
+        label = ctk.CTkLabel(row, text=text, font=("微软雅黑", 15, "bold"), anchor="w")
+        label.pack(side="left")
+        self.section_bars.append(bar)
+        self.section_labels.append(label)
+
     def build_sidebar(self):
         self.side_panel = ctk.CTkFrame(self.body, width=370, corner_radius=18)
         self.side_panel.pack(side="right", fill="y")
         self.side_panel.pack_propagate(False)
+        self.section_bars = []
+        self.section_labels = []
 
-        ctk.CTkLabel(self.side_panel, text="⚙ 加分分值", font=("微软雅黑", 15, "bold")
-                     ).pack(pady=(18, 8), anchor="w", padx=20)
+        self._section_title("加分分值")
         vrow = ctk.CTkFrame(self.side_panel, fg_color="transparent")
         vrow.pack(padx=20, fill="x")
         self.value_btns = {}
         for val in (1, 2, 5):
-            b = ctk.CTkButton(vrow, text=f"+{val}", width=72, height=34,
-                              corner_radius=17, font=("微软雅黑", 14, "bold"),
+            b = ctk.CTkButton(vrow, text=f"+{val}", width=76, height=36,
+                              corner_radius=18, font=("微软雅黑", 15, "bold"),
                               command=lambda v=val: self.set_point_value(v))
             b.pack(side="left", padx=5)
             self.value_btns[val] = b
 
-        ctk.CTkLabel(self.side_panel, text="🎯 课堂工具", font=("微软雅黑", 15, "bold")
-                     ).pack(pady=(20, 8), anchor="w", padx=20)
+        self._section_title("课堂工具")
 
-        self.roll_btn = ctk.CTkButton(
-            self.side_panel, text="随机点名", image=self.ctk_icon("dice", (48, 48)),
-            compound="left", height=54, corner_radius=27, font=("微软雅黑", 16, "bold"),
-            command=self.toggle_random_call)
-        self.roll_btn.pack(padx=24, fill="x", pady=3)
-
-        self.undo_btn = ctk.CTkButton(
-            self.side_panel, text="撤销", image=self.ctk_icon("undo", (48, 48)),
-            compound="left", height=54, corner_radius=27, font=("微软雅黑", 16, "bold"),
-            command=self.undo_action)
-        self.undo_btn.pack(padx=24, fill="x", pady=3)
-        self.redo_btn = ctk.CTkButton(
-            self.side_panel, text="重做", image=self.ctk_icon("redo", (48, 48)),
-            compound="left", height=54, corner_radius=27, font=("微软雅黑", 16, "bold"),
-            command=self.redo_action)
-        self.redo_btn.pack(padx=24, fill="x", pady=3)
-
-        self.rank_btn = ctk.CTkButton(
-            self.side_panel, text="积分排行榜", image=self.ctk_icon("trophy", (48, 48)),
-            compound="left", height=54, corner_radius=27, font=("微软雅黑", 16, "bold"),
-            command=self.show_rank)
-        self.rank_btn.pack(padx=24, fill="x", pady=3)
-
-        self.export_btn = ctk.CTkButton(
-            self.side_panel, text="导出积分表", image=self.ctk_icon("export", (48, 48)),
-            compound="left", height=54, corner_radius=27, font=("微软雅黑", 16, "bold"),
-            command=self.export_csv)
-        self.export_btn.pack(padx=20, fill="x", pady=4)
+        for attr, text, icon, cmd in (
+            ("roll_btn", "随机点名", "dice", self.toggle_random_call),
+            ("undo_btn", "撤销", "undo", self.undo_action),
+            ("redo_btn", "重做", "redo", self.redo_action),
+            ("rank_btn", "积分排行榜", "trophy", self.show_rank),
+            ("export_btn", "导出积分表", "export", self.export_csv),
+        ):
+            b = ctk.CTkButton(
+                self.side_panel, text=text, image=self.ctk_icon(icon, (44, 44)),
+                compound="left", height=52, corner_radius=26,
+                font=("微软雅黑", 15, "bold"), command=cmd)
+            b.pack(padx=22, fill="x", pady=4)
+            setattr(self, attr, b)
 
         # 点名展示区
         self.roll_display = ctk.CTkFrame(self.side_panel, height=84, corner_radius=14)
-        self.roll_display.pack(padx=20, pady=(10, 0), fill="x")
+        self.roll_display.pack(padx=20, pady=(12, 0), fill="x")
+        self.roll_display.pack_propagate(False)
         self.roll_avatar = ctk.CTkLabel(self.roll_display, text="?", font=("微软雅黑", 26, "bold"))
-        self.roll_avatar.place(relx=0.26, rely=0.5, anchor="center")
+        self.roll_avatar.place(relx=0.24, rely=0.5, anchor="center")
         self.roll_text = ctk.CTkLabel(self.roll_display, text="点击开始抽选",
-                                      font=("微软雅黑", 18, "bold"))
-        self.roll_text.place(relx=0.66, rely=0.5, anchor="center")
+                                      font=("微软雅黑", 17, "bold"))
+        self.roll_text.place(relx=0.64, rely=0.5, anchor="center")
 
-        ctk.CTkLabel(self.side_panel, text="📝 操作记录", font=("微软雅黑", 15, "bold")
-                     ).pack(pady=(16, 6), anchor="w", padx=20)
+        self._section_title("操作记录")
         self.log_box = ctk.CTkTextbox(self.side_panel, height=170, corner_radius=12,
                                       font=("微软雅黑", 12), spacing2=3)
         self.log_box.pack(padx=20, pady=(0, 16), fill="both", expand=True)
@@ -440,13 +455,12 @@ class ScoreApp(ctk.CTk):
         # 标题栏配色
         self.header.configure(fg_color=self.c["header_a"])
 
-        self.theme_btn.configure(
-            fg_color="#FFFFFF" if self.current_theme == "light" else "#2A3A55",
-            hover_color="#E2E8F0" if self.current_theme == "light" else "#35486B",
-            text_color=self.c["text_main"])
-        self.topmost_btn.configure(
-            fg_color=self.c["header_a"],
-            hover_color=self.c["header_b"], text_color="white")
+        # 主题/置顶/迷你统一浅底深字，与蓝色标题栏形成清晰对比
+        header_pill_fg = "#FFFFFF" if self.current_theme == "light" else "#2A3A55"
+        header_pill_hover = "#E2E8F0" if self.current_theme == "light" else "#35486B"
+        for btn in (self.theme_btn, self.topmost_btn, self.mini_btn):
+            btn.configure(fg_color=header_pill_fg, hover_color=header_pill_hover,
+                          text_color=self.c["text_main"])
         self.reset_all_btn.configure(fg_color=self.c["btn_sub_text"],
                                      hover_color="#B91C1C", text_color="white")
         self.min_win_btn.configure(
@@ -456,12 +470,26 @@ class ScoreApp(ctk.CTk):
             fg_color=self.c["header_a"], hover_color="#E5484D", text_color="white")
 
         self.side_panel.configure(fg_color=self.c["side_panel"])
+        for lbl in self.section_labels:
+            lbl.configure(text_color=self.c["section_title"])
+        for bar in self.section_bars:
+            bar.configure(fg_color=self.c["section_title"])
 
         for name in self.scores:
             card = self.card_frames[name]
             card.configure(fg_color=self.c["card_bg"], border_color=self.c["card_border"])
             self.name_labels[name].configure(text_color=self.c["text_main"])
             self.score_labels[name].configure(text_color=self.c["score_color"])
+            self.unit_labels[name].configure(text_color=self.c["text_gray"])
+            self.add_btns[name].configure(
+                fg_color=self.c["btn_add"], hover_color=self.c["btn_add_hover"],
+                text_color="white")
+            self.sub_btns[name].configure(
+                fg_color=self.c["btn_sub"], hover_color=self.c["btn_sub_hover"],
+                text_color=self.c["btn_sub_text"])
+            self.clear_btns[name].configure(
+                fg_color=self.c["btn_clear"], hover_color=self.c["btn_clear_hover"],
+                text_color=self.c["btn_clear_text"])
 
         for b in (self.roll_btn, self.undo_btn, self.redo_btn, self.rank_btn, self.export_btn):
             b.configure(fg_color=self.c["side_btn"], hover_color=self.c["side_btn_hover"],
@@ -499,7 +527,7 @@ class ScoreApp(ctk.CTk):
         self.all_data["point_value"] = val
         save_data(self.all_data)
         for name, b in self.add_btns.items():
-            b.configure(text=f"＋ {val} 分")
+            b.configure(text=f"＋ {val}")
         self.update_value_btns()
         self.add_log(f"加分分值设为 +{val}")
 
@@ -789,7 +817,8 @@ class ScoreApp(ctk.CTk):
         # 用原顺序重建 students，避免 pop+赋值把改名学生挤到末尾、卡片重排
         self.scores = {new_name if k == old_name else k: v for k, v in self.scores.items()}
         self.all_data["students"] = self.scores
-        for key in ("score_labels", "card_frames", "name_labels", "add_btns"):
+        for key in ("score_labels", "card_frames", "name_labels", "unit_labels",
+                    "add_btns", "sub_btns", "clear_btns"):
             getattr(self, key)[new_name] = getattr(self, key).pop(old_name)
         if old_name in self.mini_score_labels:
             self.mini_score_labels[new_name] = self.mini_score_labels.pop(old_name)
